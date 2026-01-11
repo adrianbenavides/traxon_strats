@@ -1,0 +1,365 @@
+swagger: "2.0"
+info:
+  description: "RobotWealth API"
+  version: "1.0.0"
+  title: "rw-api"
+  contact:
+    email: "kris@robotwealth.com"
+
+basePath: "/v1"
+tags:
+  - name: "RW Strategy API"
+    description: "Get latest data for RW Strategies"
+
+  - name: "status"
+    description: "Checks if the API is running"
+
+schemes:
+  - "https"
+
+produces:
+  - application/json
+
+host: api.robotwealth.com
+
+securityDefinitions:
+  ApiKeyAuth:
+    type: apiKey
+    in: query
+    name: api_key
+
+paths:
+  /status:
+    get:
+      tags:
+        - "status"
+      summary: "Checks if the API is running"
+      operationId: "checkHealth"
+      produces:
+        - "application/json"
+      responses:
+        "200":
+          description: "Successful operation"
+          schema:
+            type: object
+            properties:
+              success:
+                type: string
+                example: "true"
+              time:
+                type: string
+                example: Tue, 21 Sep 2021 18:32:41 GMT
+        "429":
+          description: "Too many requests - Endpoint is limited to 20 requests per minute"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "ratelimit exceeded 20 requests per minute"
+              success:
+                type: string
+                example: "false"
+
+  /yolo/factors:
+    get:
+      tags:
+        - "Y.O.L.O"
+      summary: "Provides latest factor values (those included in the strategy compositions)"
+      operationId: "getFactors"
+      produces:
+        - "application/json"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          type: string
+          name: api_key
+          description: API Token
+          required: true
+      responses:
+        "200":
+          description: "Successful operation"
+          schema:
+            type: object
+            properties:
+              success:
+                type: string
+                example: "true"
+                description: Indicates state of request
+              last_updated:
+                type: integer
+                example: 1636533985
+                description: When was the data last refreshed (time in seconds since the Epoch)
+              data:
+                type: array
+                description: Array. Holds factor values, returns each factor value used in the megafactor compositon for each coin
+                items:
+                  type: object
+                  properties:
+                    ticker:
+                      type: string
+                      example: "DOGE/USD"
+                    date:
+                      type: string
+                      example: "2021-06-09"
+                      description: Latest date of the OHLC bar used in the calculation
+                    factor_name:
+                      type: string
+                      example: "X_MOM_30"
+                    value:
+                      type: number
+                      example: 0.20
+        "401":
+          description: "Unauthenticated"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Invalid token!
+              success:
+                type: string
+                example: "false"
+        "429":
+          description: "Too many requests - Endpoint is limited to 10 requests per minute"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "ratelimit exceeded 10 requests per minute"
+              success:
+                type: string
+                example: "false"
+
+
+  /yolo/weights:
+    get:
+      tags:
+        - "Y.O.L.O"
+      summary: "Get Y.O.L.O strategy weights with arrival price. These weights have not been vol-scaled."
+      operationId: "getWeights"
+      produces:
+        - "application/json"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          type: string
+          name: api_key
+          description: API Token
+          required: true
+      responses:
+        "200":
+          description: "Successful operation"
+          schema:
+            type: object
+            properties:
+              success:
+                type: "string"
+                description: Indicates state of request
+                example: "true"
+              last_updated:
+                type: integer
+                example: 1636533985
+                description: When was the data last refreshed (time in seconds since the Epoch)
+              data:
+                type: array
+                description: Holds weights for top 10 coins by market cap (as per coinmetrics)
+                items:
+                  type: object
+                  properties:
+                    ticker:
+                      type: string
+                      example: "BTC/USD"
+                    date:
+                      type: string
+                      example: "2021-06-09"
+                      description: Latest date of the OHLC bar used in the calculation
+                    momentum_megafactor:
+                      type: number
+                      example: 0.125
+                      description: Aggregated momentum megafactor. Scaled by the sum of the absolute values of the ticker-wise weights.
+                    trend_megafactor:
+                      type: number
+                      example: -0.05
+                      description: Aggregated trend megafactor. Mean of scaled and clamped features (individual features scaled by their standard deviation and clamped to a range of -0.125 to +0.125)
+                    carry_megafactor:
+                      type: number
+                      example: -0.05
+                      description: Aggregated carry megafactor (mean of individual carry factors). Individual carry factors are scaled by their cross-sectional z-score and clamped to a min/max of -2.5/+2.5, then scaled down by a factor of 10. Individual factors can therefore range from -0.25 to +0.25, and the sum of the carry weights on any given day can sometimes be non-zero.
+                    combo_weight:
+                      type: number
+                      example: 0.0375
+                      description: Combined trend-momentum-carry weights (one-third of each factor).
+                    arrival_price:
+                      type: number
+                      example: 49500
+        "401":
+          description: "Unauthenticated"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Invalid token!
+              success:
+                type: string
+                example: "false"
+        "429":
+          description: "Too many requests - Endpoint is limited to 10 requests per minute"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "ratelimit exceeded 10 requests per minute"
+              success:
+                type: string
+                example: "false"
+  /yolo/volatilities:
+    get:
+      tags:
+        - "Y.O.L.O"
+      summary: "Get Y.O.L.O asset-wise exponentially weighted volatility estimate (lambda = 0.94)"
+      operationId: "getVolatilities"
+      produces:
+        - "application/json"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          type: string
+          name: api_key
+          description: API Token
+          required: true
+      responses:
+        "200":
+          description: "Successful operation"
+          schema:
+            type: object
+            properties:
+              success:
+                type: "string"
+                description: Indicates state of request
+                example: "true"
+              last_updated:
+                type: integer
+                example: 1636533985
+                description: When was the data last refreshed (time in seconds since the Epoch)
+              data:
+                type: array
+                description: Holds volatilities for the Y.O.L.O universe
+                items:
+                  type: object
+                  properties:
+                    ticker:
+                      type: string
+                      example: "BTC/USD"
+                    date:
+                      type: string
+                      example: "2021-06-09"
+                      description: Latest date of the OHLC bar used in the calculation
+                    ewvol:
+                      type: number
+                      example: 0.125
+        "401":
+          description: "Unauthenticated"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Invalid token!
+              success:
+                type: string
+                example: "false"
+        "429":
+          description: "Too many requests - Endpoint is limited to 10 requests per minute"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "ratelimit exceeded 10 requests per minute"
+              success:
+                type: string
+                example: "false"
+  /rpschteroids/weights:
+    get:
+      tags:
+        - "rpschteroids"
+      summary: "Get Risk Premia on Schteroids strategy weights, as well as equal-vol weights and pairwsie correlation delta used for adjustment, per the Risk Premia research notebooks in the Macro Pod, particularly https://github.com/RWLab/macro-pod/blob/main/research/risk_premia/9_final_strategy_etf_simulation.ipynb"
+      operationId: "getRPWeights"
+      produces:
+        - "application/json"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          type: string
+          name: api_key
+          description: API Token
+          required: true
+      responses:
+        "200":
+          description: "Successful operation"
+          schema:
+            type: object
+            properties:
+              success:
+                type: "string"
+                description: Indicates state of request
+                example: "true"
+              last_updated:
+                type: integer
+                example: 1636533985
+                description: When was the data last refreshed (time in seconds since the Epoch)
+              data:
+                type: array
+                description: Holds adjusted strategy weights, equal vol weights and pairwise correlation delta for each ticker. See descriptions below for calculation overview, and the Risk Premia research notebooks in the Macro Pod for details, particularly https://github.com/RWLab/macro-pod/blob/main/research/risk_premia/9_final_strategy_etf_simulation.ipynb.
+                items:
+                  type: object
+                  properties:
+                    ticker:
+                      type: string
+                      example: "VTI"
+                    date:
+                      type: string
+                      example: "2022-03-09"
+                      description: Date of the closing price used in the weight calculation. The intent is to trade to the weight the following day - MOC is recommended for simplicity and fidelity with simulations using closing prices.
+                    equal_vol_weight:
+                      type: number
+                      example:  0.10413
+                      description: Equal volatility weight calculated from an exponentially weighted variance using squared log returns and a decay factor (lambda) of 0.93. Given a vector x, the ith exponentially smoothed value of x is given by ewma[i]  = (1 - lambda)*x[i] + lambda*ewma[i-1].
+                    pw_cor_delta:
+                      type: number
+                      example: -0.04123
+                      description: The difference of mean pairwise correlations (associated with a single ticker) and the mean of all the pairwise correlations in the portfolio. Pairwise correlations calculated using an expomentially weighted moving average of correlation with a decay factor of 0.975.
+                    adj_weight:
+                      type: number
+                      example: 0.0913
+                      description: Adjusted strategy weight = equal_vol_weight + 2*pw_cor_delta*equal_vol_weight, constrained to be greater than or equal to zero, and scaled such that weights sum to 1.
+        "401":
+          description: "Unauthenticated"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Invalid token!
+              success:
+                type: string
+                example: "false"
+        "429":
+          description: "Too many requests - Endpoint is limited to 10 requests per minute"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "ratelimit exceeded 10 requests per minute"
+              success:
+                type: string
+                example: "false"
