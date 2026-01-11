@@ -15,6 +15,15 @@ from traxon_strats.robotwealth.api_client.errors import RWApiError, RwApiUnsucce
 from traxon_strats.robotwealth.api_client.models import (
     StatusResponse,
 )
+from traxon_strats.robotwealth.api_client.rp import RPWeightsResponse, RPWeightsSchema
+from traxon_strats.robotwealth.api_client.yolo import (
+    YoloFactorsResponse,
+    YoloFactorsSchema,
+    YoloVolatilitiesResponse,
+    YoloVolatilitiesSchema,
+    YoloWeightsResponse,
+    YoloWeightsSchema,
+)
 
 JsonResponse = dict[str, object]
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
@@ -110,3 +119,35 @@ class RWApiClient:
     async def get_status(self) -> StatusResponse:
         data = await self._get("/status")
         return StatusResponse.model_validate(data)
+
+    @beartype
+    async def get_yolo_factors(self) -> DataFrame[YoloFactorsSchema]:
+        return await self._fetch_and_validate(
+            f"/yolo/factors?api_key={self._api_key}",
+            YoloFactorsResponse,
+            YoloFactorsSchema,
+        )
+
+    @beartype
+    async def get_yolo_weights(self) -> DataFrame[YoloWeightsSchema]:
+        return await self._fetch_and_validate(
+            f"/yolo/weights?api_key={self._api_key}",
+            YoloWeightsResponse,
+            YoloWeightsSchema,
+        )
+
+    @beartype
+    async def get_yolo_volatilities(self) -> DataFrame[YoloVolatilitiesSchema]:
+        return await self._fetch_and_validate(
+            f"/yolo/volatilities?api_key={self._api_key}",
+            YoloVolatilitiesResponse,
+            YoloVolatilitiesSchema,
+        )
+
+    @beartype
+    async def get_rp_weights(self) -> DataFrame[RPWeightsSchema]:
+        return await self._fetch_and_validate(
+            f"/rpschteroids/weights?api_key={self._api_key}",
+            RPWeightsResponse,
+            RPWeightsSchema,
+        )
