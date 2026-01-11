@@ -1,7 +1,7 @@
 [project]
 name = "traxon-strats"
 version = "0.1.0"
-description = "Add your description here"
+description = "Implementation of crypto trading strategies and durable orchestration flows built on the Traxon Core library."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -18,7 +18,8 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-traxon_core = { path = "../traxon_core", editable = true }
+#traxon_core = { path = "../traxon_core", editable = true }
+traxon_core = { git = "https://github.com/adrianbenavides/traxon_core", rev = "80d24cf9f300a2adeea628ae78f4bf6a3f7f1202" }
 
 [dependency-groups]
 dev = [
@@ -30,7 +31,7 @@ dev = [
   "pytest>=8.4.1",
   "pytest-asyncio>=1.1.0",
   "pytest-cov>=7.0.0",
-  "ruff>=0.12.11",
+  "ruff>=0.14.11",
   "types-pyyaml>=6.0.12.20250822",
 ]
 
