@@ -4,7 +4,7 @@ from beartype import beartype
 from temporalio import activity
 from traxon_core.crypto.data_fetchers.portfolio import PortfolioFetcher
 from traxon_core.crypto.data_fetchers.prices import PriceFetcher
-from traxon_core.persistence.db.duckdb import DuckDBConfig, DuckDbDatabase
+from traxon_core.persistence.db import create_database
 
 from traxon_strats.crypto.services.equity import EquityService
 from traxon_strats.persistence.duckdb.repositories.accounts import DuckDbAccountsRepository
@@ -14,10 +14,8 @@ from traxon_strats.robotwealth.yolo.strategy import YoloStrategy
 
 
 class YoloActivities:
-    def __init__(self, config: YoloConfig, services_config: ServicesConfig, db_path: str):
-        # Setup dependencies
-        # TODO: inject DB or init from config
-        db = DuckDbDatabase(DuckDBConfig(path=db_path))
+    def __init__(self, config: YoloConfig, services_config: ServicesConfig):
+        db = create_database(services_config.database)
         yolo_repo = DuckDbYoloRepository(db)
         accounts_repo = DuckDbAccountsRepository(db)
         price_fetcher = PriceFetcher()

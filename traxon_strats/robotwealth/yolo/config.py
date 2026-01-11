@@ -6,7 +6,7 @@ from typing import Self
 from beartype import beartype
 from pydantic import BaseModel, ConfigDict, Field
 from traxon_core import config
-from traxon_core.config import ExchangeConfig, ExecutorConfig
+from traxon_core.config import CacheConfig, DatabaseConfig, ExchangeConfig, ExecutorConfig
 
 
 @beartype
@@ -23,6 +23,8 @@ class ServicesConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     temporal: TemporalConfig
     robot_wealth_api_key: str = Field(repr=True, min_length=1)
+    database: DatabaseConfig
+    cache: CacheConfig
 
 
 @beartype

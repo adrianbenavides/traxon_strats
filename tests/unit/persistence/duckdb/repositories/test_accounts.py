@@ -1,6 +1,6 @@
+from datetime import datetime
 from unittest.mock import MagicMock
 
-import pandas as pd
 import polars as pl
 import pytest
 from traxon_core.persistence.db.base import Database
@@ -31,7 +31,6 @@ async def test_store_equity(repository: DuckDbAccountsRepository, mock_db: Magic
     await repository.store_equity("test_account", 1000.0)
     mock_db.execute.assert_called_once()
 
-    # Verify validation
     with pytest.raises(ValueError):
         await repository.store_equity("", 1000.0)
 
@@ -42,7 +41,6 @@ async def test_store_equity(repository: DuckDbAccountsRepository, mock_db: Magic
 @pytest.mark.asyncio
 async def test_get_latest_equity(repository: DuckDbAccountsRepository, mock_db: MagicMock) -> None:
     mock_db.fetchone.return_value = (1500.0,)
-
     equity = await repository.get_latest_equity("test_account")
     assert equity == 1500.0
 
@@ -53,9 +51,7 @@ async def test_get_latest_equity(repository: DuckDbAccountsRepository, mock_db: 
 
 @pytest.mark.asyncio
 async def test_get_equity_history(repository: DuckDbAccountsRepository, mock_db: MagicMock) -> None:
-    data = pd.DataFrame(
-        {"name": ["test_account"], "updated_at": [pd.Timestamp("2023-01-01", tz="UTC")], "equity": [1000.0]}
-    )
+    data = pl.DataFrame({"name": ["test_account"], "updated_at": [datetime(2023, 1, 1)], "equity": [1000.0]})
     mock_db.fetchdf.return_value = data
 
     history = await repository.get_equity_history("test_account")

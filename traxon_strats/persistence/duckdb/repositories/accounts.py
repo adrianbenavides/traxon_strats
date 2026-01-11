@@ -86,10 +86,8 @@ class DuckDbAccountsRepository:
         """
         df = self._database.execute(query_sql, [name]).fetchdf()
 
-        if df.empty:
+        if df.is_empty():
             return pl.DataFrame(schema=AccountsSchema.to_schema().columns)
 
-        df_pl = pl.from_pandas(df)
-        df_pl = df_pl.with_columns(pl.col("updated_at").dt.cast_time_unit("us").dt.replace_time_zone(None))
-        validated_df = AccountsSchema.validate(df_pl)
+        validated_df = AccountsSchema.validate(df)
         return validated_df

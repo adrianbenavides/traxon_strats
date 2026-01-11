@@ -63,9 +63,8 @@ class DuckDbYoloRepository:
     @beartype
     async def store_weights(self, weights: pl.DataFrame) -> None:
         """Store weights DataFrame in DB."""
-        _weights = weights.to_pandas()
         with self._database.transaction():
-            self._database.register_temp_table("_weights_tmp", _weights)
+            self._database.register_temp_table("_weights_tmp", weights)
             self._database.execute(
                 f"insert or replace into {self._WEIGHTS_TABLE_NAME} select * from _weights_tmp",
             )
@@ -73,9 +72,8 @@ class DuckDbYoloRepository:
     @beartype
     async def store_volatilities(self, volatilities: pl.DataFrame) -> None:
         """Store volatilities DataFrame in DB."""
-        _volatilities = volatilities.to_pandas()
         with self._database.transaction():
-            self._database.register_temp_table("_volatilities_tmp", _volatilities)
+            self._database.register_temp_table("_volatilities_tmp", volatilities)
             self._database.execute(
                 f"insert or replace into {self._VOLATILITIES_TABLE_NAME} select * from _volatilities_tmp",
             )
@@ -88,12 +86,11 @@ class DuckDbYoloRepository:
             where updated_at = ?
         """
         df = self._database.execute(query_sql, [_date.strftime(dates.date_format)]).fetchdf()
-        logger.info(f"fetched weights for date {_date}: {df.shape[0]} rows")
-        if df.empty:
+        logger.info(f"fetched weights for date {_date}: {df.height} rows")
+        if df.is_empty():
             return pl.DataFrame(schema=YoloWeightsSchema.to_schema().columns)
 
-        df_pl = pl.from_pandas(df)
-        validated_df = YoloWeightsSchema.validate(df_pl)
+        validated_df = YoloWeightsSchema.validate(df)
         return validated_df
 
     @beartype
@@ -104,10 +101,9 @@ class DuckDbYoloRepository:
             where updated_at = ?
         """
         df = self._database.execute(query_sql, [_date.strftime(dates.date_format)]).fetchdf()
-        logger.info(f"fetched volatilities for date {_date}: {df.shape[0]} rows")
-        if df.empty:
+        logger.info(f"fetched volatilities for date {_date}: {df.height} rows")
+        if df.is_empty():
             return pl.DataFrame(schema=YoloVolatilitiesSchema.to_schema().columns)
 
-        df_pl = pl.from_pandas(df)
-        validated_df = YoloVolatilitiesSchema.validate(df_pl)
+        validated_df = YoloVolatilitiesSchema.validate(df)
         return validated_df

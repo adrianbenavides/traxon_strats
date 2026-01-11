@@ -5,7 +5,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import polars as pl
 import pytest
-from traxon_core.config import ExchangeConfig, ExecutorConfig
+from traxon_core.config import (
+    CacheConfig,
+    DatabaseConfig,
+    DiskConfig,
+    DuckDBConfig,
+    ExchangeConfig,
+    ExecutorConfig,
+)
 from traxon_core.crypto.data_fetchers.portfolio import PortfolioFetcher
 from traxon_core.crypto.exchanges import Exchange
 from traxon_core.crypto.models import AccountEquity, ExchangeId, Portfolio, Symbol
@@ -55,6 +62,8 @@ class TestYoloStrategy:
         services_config = ServicesConfig(
             temporal=TemporalConfig(host="localhost", port=7233, namespace="default", task_queue="yolo"),
             robot_wealth_api_key="rw_key",
+            database=DuckDBConfig(path="/tmp/test.db"),
+            cache=DiskConfig(path="/tmp/cache"),
         )
 
         portfolio_fetcher = MagicMock(spec=PortfolioFetcher)

@@ -1,7 +1,6 @@
 from datetime import date
 from unittest.mock import MagicMock
 
-import pandas as pd
 import polars as pl
 import pytest
 from traxon_core.persistence.db.base import Database
@@ -25,8 +24,7 @@ def repository(mock_db: MagicMock) -> DuckDbYoloRepository:
 @pytest.mark.asyncio
 async def test_init_tables(repository: DuckDbYoloRepository, mock_db: MagicMock) -> None:
     await repository.init_tables()
-
-    assert mock_db.execute.call_count >= 2  # At least creates tables
+    assert mock_db.execute.call_count >= 2
 
 
 @pytest.mark.asyncio
@@ -42,16 +40,14 @@ async def test_store_weights(repository: DuckDbYoloRepository, mock_db: MagicMoc
             "arrival_price": [100.0],
         }
     )
-
     await repository.store_weights(weights)
-
     mock_db.register_temp_table.assert_called_once()
     mock_db.execute.assert_called()
 
 
 @pytest.mark.asyncio
 async def test_get_weights(repository: DuckDbYoloRepository, mock_db: MagicMock) -> None:
-    expected_df = pd.DataFrame(
+    expected_df = pl.DataFrame(
         {
             "symbol": ["BTC-USDT"],
             "updated_at": ["2023-01-01"],
