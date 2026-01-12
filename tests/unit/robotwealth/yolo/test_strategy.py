@@ -6,8 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import polars as pl
 import pytest
 from traxon_core.config import (
-    CacheConfig,
-    DatabaseConfig,
     DiskConfig,
     DuckDBConfig,
     ExchangeConfig,

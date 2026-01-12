@@ -15,7 +15,6 @@ from traxon_core.logs.structlog import logger
 from traxon_strats.crypto.services.equity import EquityService
 from traxon_strats.persistence.repositories.interfaces import YoloRepository
 from traxon_strats.robotwealth.api_client import RWApiClient
-from traxon_strats.robotwealth.yolo.calculator import YoloCalculator
 from traxon_strats.robotwealth.yolo.config import ServicesConfig, YoloConfig
 from traxon_strats.robotwealth.yolo.errors import (
     YoloApiDataNotUpToDateError,
@@ -23,6 +22,8 @@ from traxon_strats.robotwealth.yolo.errors import (
     YoloStrategyError,
 )
 from traxon_strats.robotwealth.yolo.order_builder import YoloOrderBuilder
+from traxon_strats.robotwealth.yolo.pipeline import RobotWealthSignalStep, SignalStep
+from traxon_strats.robotwealth.yolo.portfolio_sizer import YoloPositionSizer
 
 
 class YoloStrategy:
@@ -34,6 +35,8 @@ class YoloStrategy:
         "_equity_service",
         "_calculator",
         "_order_builder",
+        "_pipeline",
+        "_portfolio_sizer",
         "_logger",
     )
 
@@ -45,16 +48,20 @@ class YoloStrategy:
         portfolio_fetcher: PortfolioFetcher,
         yolo_repository: YoloRepository,
         equity_service: EquityService,
-        calculator: YoloCalculator | None = None,
-        order_builder: YoloOrderBuilder | None = None,
+        pipeline: list[SignalStep] | None = None,
     ) -> None:
         self._config: Final[YoloConfig] = config
         self._services_config: Final[ServicesConfig] = services_config
         self._portfolio_fetcher: Final[PortfolioFetcher] = portfolio_fetcher
         self._yolo_repository = yolo_repository
         self._equity_service = equity_service
-        self._calculator = calculator or YoloCalculator()
-        self._order_builder = order_builder or YoloOrderBuilder()
+        self._order_builder = YoloOrderBuilder()
+        self._portfolio_sizer = YoloPositionSizer()
+        self._pipeline: list[SignalStep] = (
+            [RobotWealthSignalStep(config.settings, yolo_repository, datetime.today())]
+            if pipeline is None or not pipeline
+            else pipeline
+        )
         self._logger = logger.bind(component=self.__class__.__name__)
 
     @beartype
@@ -73,8 +80,7 @@ class YoloStrategy:
         self._logger.info(f"fetching yolo strategy params for {today_str}")
         async with RWApiClient(self._services_config.robot_wealth_api_key) as client:
             # Fetch weights
-            weights_pd = await client.get_yolo_weights()
-            weights = pl.from_pandas(weights_pd)
+            weights = await client.get_yolo_weights()
             self._logger.info("yolo weights:", df=weights.sort("symbol"))
             if weights.is_empty():
                 self._logger.warning("yolo weights are empty")
@@ -86,8 +92,7 @@ class YoloStrategy:
             await self._yolo_repository.store_weights(weights)
 
             # Fetch volatilities
-            volatilities_pd = await client.get_yolo_volatilities()
-            volatilities = pl.from_pandas(volatilities_pd)
+            volatilities = await client.get_yolo_volatilities()
             self._logger.info("yolo volatilities:", df=volatilities.sort("symbol"))
             if volatilities.is_empty():
                 self._logger.warning("yolo weights or volatilities are empty")
@@ -102,16 +107,6 @@ class YoloStrategy:
 
     @beartype
     async def run_strategy(self) -> None:
-        today = datetime.today().date()
-
-        # Load weights and volatilities from DB
-        self._logger.info(f"fetching yolo strategy params from DB for {today}")
-        weights = await self._yolo_repository.get_weights(today)
-        volatilities = await self._yolo_repository.get_volatilities(today)
-
-        if weights.is_empty() or volatilities.is_empty():
-            raise YoloApiDataNotUpToDateError()
-
         exchange = await self._get_exchange()
         try:
             # Get account equity
@@ -128,9 +123,22 @@ class YoloStrategy:
             portfolio = portfolios[0]  # Yolo works with a single exchange
 
             self._logger.info("current portfolio:", exchange=exchange.id)
-            target_positions = self._calculator.calculate(
-                equity, self._config.settings, weights, volatilities, portfolio
+
+            # Pipeline
+            self._logger.info("executing yolo signal pipeline")
+            for step in self._pipeline:
+                await step.setup()
+
+            target_weights = pl.DataFrame()
+            for step in self._pipeline:
+                target_weights = await step.run(target_weights)
+
+            # TODO: check this
+            target_portfolio = self._portfolio_sizer.size_portfolio(equity, target_weights, portfolio)
+            target_positions = self._portfolio_sizer.calculate_orders(
+                target_portfolio, portfolio, self._config.settings
             )
+
             self._logger.info("target positions:", df=target_positions.sort("symbol"))
             orders = await self._order_builder.prepare_orders(exchange, target_positions)
 
@@ -150,9 +158,16 @@ class YoloStrategy:
             if not self._config.settings.dry_run and not orders.is_empty():
                 portfolios = await self._portfolio_fetcher.fetch_portfolios([exchange])
                 portfolio = portfolios[0]
-                target_positions = self._calculator.calculate(
-                    equity, self._config.settings, weights, volatilities, portfolio
+
+                # Pipeline
+                target_weights = pl.DataFrame()
+                for step in self._pipeline:
+                    target_weights = await step.run(target_weights)
+                target_portfolio = self._portfolio_sizer.size_portfolio(equity, target_weights, portfolio)
+                target_positions = self._portfolio_sizer.calculate_orders(
+                    target_portfolio, portfolio, self._config.settings
                 )
+
                 orders = await self._order_builder.prepare_orders(exchange, target_positions)
                 if not orders.is_empty():
                     self._logger.warning("positions do not match target after order execution")

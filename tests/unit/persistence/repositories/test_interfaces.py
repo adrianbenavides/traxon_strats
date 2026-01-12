@@ -1,3 +1,5 @@
+from datetime import date
+
 import polars as pl
 
 from traxon_strats.persistence.repositories.interfaces import AccountsRepository, YoloRepository
@@ -39,10 +41,10 @@ def test_yolo_repository_runtime_checkable() -> None:
         async def store_volatilities(self, volatilities: pl.DataFrame) -> None:
             pass
 
-        async def get_weights(self, _date: "date") -> pl.DataFrame:  # type: ignore
+        async def get_weights(self, _date: date) -> pl.DataFrame:
             return pl.DataFrame()
 
-        async def get_volatilities(self, _date: "date") -> pl.DataFrame:  # type: ignore
+        async def get_volatilities(self, _date: date) -> pl.DataFrame:
             return pl.DataFrame()
 
     assert isinstance(Impl(), YoloRepository)

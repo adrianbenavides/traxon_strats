@@ -1,12 +1,11 @@
 from typing import Any, Final, Self, TypeVar
 
 import httpx
-import pandas as pd
-import pandera.pandas as pa
+import pandera.polars as pa
 import polars as pl
 from beartype import beartype
 from httpx_retry import AsyncRetryTransport, RetryPolicy
-from pandera.typing import DataFrame
+from pandera.typing.polars import DataFrame
 from pydantic import BaseModel
 from traxon_core.errors import NonRecoverableError
 from traxon_core.logs.structlog import logger
@@ -101,18 +100,30 @@ class RWApiClient:
         res: ResponseT = response_type.model_validate(json)
         if not getattr(res, "success", False):
             raise RwApiUnsuccessfulResponse()
-        df = pd.DataFrame([w.model_dump() for w in getattr(res, "data")])
-        self._logger.debug("raw df", df=pl.DataFrame(df))
+
+        # Convert data to Polars DataFrame
+        data = [w.model_dump() for w in getattr(res, "data")]
+        if not data:
+            # Return empty DF with correct schema columns if possible,
+            # but Polars needs explicit schema for that.
+            # Pandera validate will handle empty DF if allowed.
+            df = pl.DataFrame()
+        else:
+            df = pl.DataFrame(data)
+
+        self._logger.debug("raw df", df=df)
 
         # Rename and sanitize columns
         if "ticker" in df.columns:
-            df = df.rename(columns={"ticker": "symbol"})
-            df["symbol"] = df["symbol"].apply(lambda x: self._ticker_to_symbol(str(x)))
+            df = df.rename({"ticker": "symbol"})
+            df = df.with_columns(
+                pl.col("symbol").map_elements(self._ticker_to_symbol, return_dtype=pl.String)
+            )
         if "date" in df.columns:
-            df = df.rename(columns={"date": "updated_at"})
+            df = df.rename({"date": "updated_at"})
 
         validated_df: DataFrame[SchemaT] = schema_type.validate(df)
-        self._logger.debug("validated df", df=pl.DataFrame(validated_df))
+        self._logger.debug("validated df", df=validated_df)
         return validated_df
 
     @beartype
