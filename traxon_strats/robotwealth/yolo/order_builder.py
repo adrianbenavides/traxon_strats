@@ -31,10 +31,10 @@ class YoloOrderBuilder:
     async def prepare_orders(
         self,
         exchange: Exchange,
-        positions: pl.DataFrame,
+        target_portfolio: pl.DataFrame,
     ) -> OrdersToExecute:
-        """Translate target positions into actionable orders."""
-        positions = TargetPortfolioSchema.validate(positions)
+        """Translate target portfolio into actionable orders."""
+        target_portfolio = TargetPortfolioSchema.validate(target_portfolio)
 
         updates_by_symbol: dict[BaseQuote, list[OrderBuilder]] = defaultdict(list)
         new_by_symbol: dict[BaseQuote, list[OrderBuilder]] = defaultdict(list)
@@ -46,7 +46,7 @@ class YoloOrderBuilder:
             else:
                 return Symbol(f"{sym.base}/{sym.quote}:{sym.quote}")
 
-        for row in positions.to_dicts():
+        for row in target_portfolio.to_dicts():
             delta = float(row["delta"])
 
             if float_is_zero(delta):
@@ -59,7 +59,7 @@ class YoloOrderBuilder:
             arrival_price = float(row["arrival_price"])
             delta_value = float(row["delta_value"])
 
-            # The direction is flipping if the current and target positions have opposite signs
+            # The direction is flipping if the current and target portfolio have opposite signs
             direction_flip: bool = notional_size_signed * target_size_signed < 0
 
             if direction_flip:

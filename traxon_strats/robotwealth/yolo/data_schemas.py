@@ -31,7 +31,7 @@ class TargetWeightsSchema(pa.DataFrameModel):
 class TargetPortfolioSchema(pa.DataFrameModel):
     """
     Final schema for the pipeline.
-    Represents the target position sizes and values.
+    Represents the target portfolio sizes and values.
     """
 
     symbol: pl.String

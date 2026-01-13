@@ -136,33 +136,55 @@ class YoloPortfolioSizer:
         target_size: float,
         trade_buffer: float,
     ) -> float:
-        """Calculate the signed delta to trade from current to target size, considering the trade buffer."""
+        """Calculate the signed delta to trade from current to target size, considering the trade buffer.
+
+        Returns:
+            Positive delta: increase position (buy for longs, cover for shorts)
+            Negative delta: decrease position (sell for longs, short more for shorts)
+            Zero: no trade needed (within buffer)
+        """
+        # Handle zero cases - return full target size
         if float_is_zero(current_size):
             return target_size
         if float_is_zero(target_size):
             return -current_size
 
+        # Calculate bounds based on absolute target size
         abs_target = abs(target_size)
         abs_current = abs(current_size)
 
         lower_bound = abs_target * (1 - trade_buffer)
         upper_bound = abs_target * (1 + trade_buffer)
 
+        # Check for direction flip (opposite signs)
         if current_size * target_size < 0:
+            # Direction flip: close current position + open to lower bound of target
+            # The delta is: -current_size (to close) + target_bound (to open)
             if target_size > 0:
+                # Flipping to long: target the lower bound
                 return -current_size + lower_bound
             else:
+                # Flipping to short: target the lower bound (as negative)
                 return -current_size - lower_bound
 
+        # Same direction: use buffer logic with signed values
+        # Check if current is within buffer range
         if lower_bound <= abs_current <= upper_bound:
             return 0.0
 
+        # Calculate signed delta to reach the appropriate bound
+        # Determine which bound to target based on absolute values
         if abs_current < lower_bound:
+            # Need to increase absolute position size
             target_abs = lower_bound
         else:
+            # Need to decrease absolute position size
             target_abs = upper_bound
 
+        # Convert back to signed value preserving the direction
         if target_size > 0:
+            # Long position: delta = target - current
             return target_abs - abs_current
         else:
+            # Short position: delta = -(target - current) = current - target
             return -(target_abs - abs_current)

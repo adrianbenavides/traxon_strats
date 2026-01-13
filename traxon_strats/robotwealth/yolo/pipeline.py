@@ -60,7 +60,7 @@ class RobotWealthSignalStep:
         else:
             df = self.api_weights.join(weights, on="symbol", how="left")
 
-        # == Calculate target weights
+        # Calculate target weights
         df = df.with_columns(
             [
                 (

@@ -16,8 +16,8 @@ from traxon_strats.robotwealth.yolo.data_schemas import TargetPortfolioSchema
 from traxon_strats.robotwealth.yolo.portfolio_sizer import YoloPortfolioSizer
 
 
-class TestYoloPositionSizerProperties:
-    """Property-based tests for YoloPositionSizer."""
+class TestYoloPortfolioSizerProperties:
+    """Property-based tests for YoloPortfolioSizer."""
 
     @given(
         current_size=st.one_of(
@@ -76,7 +76,7 @@ class TestYoloPositionSizerProperties:
 
 
 class TestCalculatePositionSize:
-    """Test suite for YoloPositionSizer.calculate_position_size static method."""
+    """Test suite for YoloPortfolioSizer.calculate_position_size static method."""
 
     def test_zero_inputs(self) -> None:
         """When current or target size is zero, should handle correctly."""

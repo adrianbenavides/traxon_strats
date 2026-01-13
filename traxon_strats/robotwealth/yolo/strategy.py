@@ -133,12 +133,12 @@ class YoloStrategy:
             for step in self._pipeline:
                 target_weights = await step.run(target_weights)
 
-            target_positions = self._portfolio_sizer.size_portfolio(
+            target_portfolio = self._portfolio_sizer.size_portfolio(
                 equity, target_weights, portfolio, self._config.settings
             )
 
-            self._logger.info("target positions:", df=target_positions.sort("symbol"))
-            orders = await self._order_builder.prepare_orders(exchange, target_positions)
+            self._logger.info("target portfolio:", df=target_portfolio.sort("symbol"))
+            orders = await self._order_builder.prepare_orders(exchange, target_portfolio)
 
             if not orders.is_empty():
                 await orders.log_as_df("yolo orders")
@@ -152,7 +152,7 @@ class YoloStrategy:
                 executor = DefaultOrderExecutor(self._config.settings.executor)
                 await executor.execute_orders([exchange], orders)
 
-            # Validate positions
+            # Validate portfolio
             if not self._config.settings.dry_run and not orders.is_empty():
                 portfolios = await self._portfolio_fetcher.fetch_portfolios([exchange])
                 portfolio = portfolios[0]
@@ -161,16 +161,16 @@ class YoloStrategy:
                 target_weights = pl.DataFrame()
                 for step in self._pipeline:
                     target_weights = await step.run(target_weights)
-                target_positions = self._portfolio_sizer.size_portfolio(
+                target_portfolio = self._portfolio_sizer.size_portfolio(
                     equity, target_weights, portfolio, self._config.settings
                 )
 
-                orders = await self._order_builder.prepare_orders(exchange, target_positions)
+                orders = await self._order_builder.prepare_orders(exchange, target_portfolio)
                 if not orders.is_empty():
-                    self._logger.warning("positions do not match target after order execution")
+                    self._logger.warning("portfolio do not match target after order execution")
                     await orders.log_as_df("yolo remaining orders")
                 else:
-                    self._logger.info("all positions match target after order execution")
+                    self._logger.info("all portfolio match target after order execution")
 
             self._logger.info("yolo strategy run complete")
             self._logger.info("==============================")
