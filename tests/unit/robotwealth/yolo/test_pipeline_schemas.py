@@ -40,7 +40,11 @@ def test_target_portfolio_schema_validation() -> None:
             "target_value": [1500.0],
             "arrival_price": [1000.0],
             "updated_at": ["2023-01-01T00:00:00"],
+            "price": [1000.0],
+            "notional_size_signed": [1.0],
+            "delta": [0.5],
+            "delta_value": [500.0],
         }
     )
     validated = TargetPortfolioSchema.validate(df)
-    assert validated.shape == (1, 5)
+    assert validated.shape == (1, 9)

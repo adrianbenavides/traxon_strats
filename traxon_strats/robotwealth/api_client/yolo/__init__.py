@@ -1,7 +1,5 @@
 from .data_schemas import (
     YoloFactorsSchema,
-    YoloPositionsRow,
-    YoloPositionsSchema,
     YoloVolatilitiesSchema,
     YoloWeightsSchema,
 )
@@ -16,8 +14,6 @@ from .models import (
 
 __all__ = [
     "YoloFactorsSchema",
-    "YoloPositionsRow",
-    "YoloPositionsSchema",
     "YoloVolatilitiesSchema",
     "YoloWeightsSchema",
     "YoloFactor",

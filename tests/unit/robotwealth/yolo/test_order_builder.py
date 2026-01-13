@@ -52,6 +52,7 @@ class TestYoloOrderBuilder:
                     "target_value": 7500.0,
                     "delta": 0.05,
                     "delta_value": 2500.0,
+                    "updated_at": "2026-01-13",
                 }
             ]
         )
@@ -113,6 +114,7 @@ class TestYoloOrderBuilder:
                     "target_value": -5000.0,
                     "delta": -0.2,
                     "delta_value": 10000.0,
+                    "updated_at": "2026-01-13",
                 }
             ]
         )

@@ -23,7 +23,7 @@ from traxon_strats.robotwealth.yolo.errors import (
 )
 from traxon_strats.robotwealth.yolo.order_builder import YoloOrderBuilder
 from traxon_strats.robotwealth.yolo.pipeline import RobotWealthSignalStep, SignalStep
-from traxon_strats.robotwealth.yolo.portfolio_sizer import YoloPositionSizer
+from traxon_strats.robotwealth.yolo.portfolio_sizer import YoloPortfolioSizer
 
 
 class YoloStrategy:
@@ -56,7 +56,7 @@ class YoloStrategy:
         self._yolo_repository = yolo_repository
         self._equity_service = equity_service
         self._order_builder = YoloOrderBuilder()
-        self._portfolio_sizer = YoloPositionSizer()
+        self._portfolio_sizer = YoloPortfolioSizer()
         self._pipeline: list[SignalStep] = (
             [RobotWealthSignalStep(config.settings, yolo_repository, datetime.today())]
             if pipeline is None or not pipeline
@@ -133,10 +133,8 @@ class YoloStrategy:
             for step in self._pipeline:
                 target_weights = await step.run(target_weights)
 
-            # TODO: check this
-            target_portfolio = self._portfolio_sizer.size_portfolio(equity, target_weights, portfolio)
-            target_positions = self._portfolio_sizer.calculate_orders(
-                target_portfolio, portfolio, self._config.settings
+            target_positions = self._portfolio_sizer.size_portfolio(
+                equity, target_weights, portfolio, self._config.settings
             )
 
             self._logger.info("target positions:", df=target_positions.sort("symbol"))
@@ -163,9 +161,8 @@ class YoloStrategy:
                 target_weights = pl.DataFrame()
                 for step in self._pipeline:
                     target_weights = await step.run(target_weights)
-                target_portfolio = self._portfolio_sizer.size_portfolio(equity, target_weights, portfolio)
-                target_positions = self._portfolio_sizer.calculate_orders(
-                    target_portfolio, portfolio, self._config.settings
+                target_positions = self._portfolio_sizer.size_portfolio(
+                    equity, target_weights, portfolio, self._config.settings
                 )
 
                 orders = await self._order_builder.prepare_orders(exchange, target_positions)

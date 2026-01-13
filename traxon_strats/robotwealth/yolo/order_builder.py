@@ -21,7 +21,7 @@ from traxon_core.crypto.utils import log_prefix
 from traxon_core.floats import float_is_zero
 from traxon_core.logs.structlog import logger
 
-from traxon_strats.robotwealth.yolo.data_schemas import YoloPositionsSchema
+from traxon_strats.robotwealth.yolo.data_schemas import TargetPortfolioSchema
 
 
 class YoloOrderBuilder:
@@ -34,8 +34,7 @@ class YoloOrderBuilder:
         positions: pl.DataFrame,
     ) -> OrdersToExecute:
         """Translate target positions into actionable orders."""
-        # Validate input
-        positions = YoloPositionsSchema.validate(positions)
+        positions = TargetPortfolioSchema.validate(positions)
 
         updates_by_symbol: dict[BaseQuote, list[OrderBuilder]] = defaultdict(list)
         new_by_symbol: dict[BaseQuote, list[OrderBuilder]] = defaultdict(list)

@@ -8,11 +8,10 @@ from traxon_strats.robotwealth.yolo.config import YoloSettingsConfig
 from traxon_strats.robotwealth.yolo.data_schemas import (
     TargetPortfolioSchema,
     TargetWeightsSchema,
-    YoloPositionsSchema,
 )
 
 
-class YoloPositionSizer:
+class YoloPortfolioSizer:
     """Handles the conversion of TargetWeights + Equity + Portfolio -> TargetPortfolio."""
 
     def size_portfolio(
@@ -20,17 +19,16 @@ class YoloPositionSizer:
         equity: float,
         target_weights: pl.DataFrame,
         portfolio: Portfolio,
+        settings: YoloSettingsConfig,
     ) -> pl.DataFrame:
-        """Calculate target positions and sizes from weights."""
+        """Calculate target portfolio, sizes, and deltas (orders) from weights."""
         target_weights = TargetWeightsSchema.validate(target_weights)
+        current_portfolio = self._portfolio_to_pl(portfolio)
 
-        # Convert portfolio to polars
-        current_positions = self._portfolio_to_pl(portfolio)
+        # Merge weights and current portfolio
+        df = target_weights.join(current_portfolio, on="symbol", how="left")
 
-        # Merge weights and current positions
-        df = target_weights.join(current_positions, on="symbol", how="left")
-
-        # Fill nulls for positions not currently held
+        # Fill nulls for portfolio not currently held
         df = df.with_columns(
             [
                 pl.col("notional_size_signed").fill_null(0.0),
@@ -39,7 +37,7 @@ class YoloPositionSizer:
             ]
         )
 
-        # Calculate current weights
+        # Calculate current weights (optional, but good for debugging)
         df = df.with_columns(
             [
                 (pl.col("notional_size_signed") * pl.col("arrival_price") / equity)
@@ -48,34 +46,9 @@ class YoloPositionSizer:
             ]
         )
 
-        # Calculate target positions
+        # Calculate target portfolio
         df = df.with_columns([(pl.col("weight") * equity).alias("target_value")])
         df = df.with_columns([(pl.col("target_value") / pl.col("arrival_price")).alias("target_size_signed")])
-
-        # Output strictly as TargetPortfolioSchema
-        return TargetPortfolioSchema.validate(
-            df.select(["symbol", "target_size_signed", "target_value", "arrival_price", "updated_at"])
-        )
-
-    def calculate_orders(
-        self,
-        target_portfolio: pl.DataFrame,
-        portfolio: Portfolio,
-        settings: YoloSettingsConfig,
-    ) -> pl.DataFrame:
-        """Calculate deltas (orders) from target positions and current portfolio."""
-        target_portfolio = TargetPortfolioSchema.validate(target_portfolio)
-        current_positions = self._portfolio_to_pl(portfolio)
-
-        df = target_portfolio.join(current_positions, on="symbol", how="left")
-
-        df = df.with_columns(
-            [
-                pl.col("notional_size_signed").fill_null(0.0),
-                pl.col("price").fill_null(pl.col("arrival_price")),
-                pl.col("size").fill_null(0.0),
-            ]
-        )
 
         # Delta calculation
         df = df.with_columns(
@@ -91,29 +64,18 @@ class YoloPositionSizer:
             ]
         )
 
-        # For YoloPositionsSchema compatibility
-        df = df.with_columns(
-            [
-                pl.lit(0.0).alias("current_weight"),  # Could calculate these but legacy needs them
-                pl.lit(0.0).alias("target_weight"),
-                pl.lit(0.0).alias("weight_diff"),
-                (pl.col("delta").abs() * pl.col("price")).alias("delta_value"),
-            ]
-        )
+        df = df.with_columns([(pl.col("delta").abs() * pl.col("price")).alias("delta_value")])
 
-        return YoloPositionsSchema.validate(
+        return TargetPortfolioSchema.validate(
             df.select(
                 [
                     "symbol",
                     "price",
-                    "arrival_price",
-                    "size",
-                    "notional_size_signed",
                     "target_size_signed",
-                    "current_weight",
-                    "target_weight",
-                    "weight_diff",
                     "target_value",
+                    "arrival_price",
+                    "updated_at",
+                    "notional_size_signed",
                     "delta",
                     "delta_value",
                 ]

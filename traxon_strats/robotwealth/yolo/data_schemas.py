@@ -4,13 +4,11 @@ import pandera.polars as pa
 import polars as pl
 
 from traxon_strats.robotwealth.api_client.yolo.data_schemas import (
-    YoloPositionsSchema,
     YoloVolatilitiesSchema,
     YoloWeightsSchema,
 )
 
 __all__ = [
-    "YoloPositionsSchema",
     "YoloVolatilitiesSchema",
     "YoloWeightsSchema",
     "TargetWeightsSchema",
@@ -37,7 +35,11 @@ class TargetPortfolioSchema(pa.DataFrameModel):
     """
 
     symbol: pl.String
+    price: pl.Float64
     target_size_signed: pl.Float64
     target_value: pl.Float64
     arrival_price: pl.Float64
+    notional_size_signed: pl.Float64
+    delta: pl.Float64
+    delta_value: pl.Float64
     updated_at: pl.String

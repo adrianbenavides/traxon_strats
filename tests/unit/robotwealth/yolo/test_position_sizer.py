@@ -4,14 +4,16 @@ import hypothesis.strategies as st
 import polars as pl
 import pytest
 from hypothesis import given
+from traxon_core.config import ExecutorConfig
 from traxon_core.crypto.models import (
     ExchangeId,
     Portfolio,
 )
 from traxon_core.floats import float_is_zero, floats_equal
 
+from traxon_strats.robotwealth.yolo.config import YoloSettingsConfig
 from traxon_strats.robotwealth.yolo.data_schemas import TargetPortfolioSchema
-from traxon_strats.robotwealth.yolo.portfolio_sizer import YoloPositionSizer
+from traxon_strats.robotwealth.yolo.portfolio_sizer import YoloPortfolioSizer
 
 
 class TestYoloPositionSizerProperties:
@@ -34,7 +36,7 @@ class TestYoloPositionSizerProperties:
         self, current_size: float, target_size: float, trade_buffer: float
     ) -> None:
         """Verify invariants of position size calculation."""
-        delta = YoloPositionSizer.calculate_position_size(current_size, target_size, trade_buffer)
+        delta = YoloPortfolioSizer.calculate_position_size(current_size, target_size, trade_buffer)
 
         # Invariant 1: If target is 0, delta must close the position
         if float_is_zero(target_size):
@@ -80,22 +82,22 @@ class TestCalculatePositionSize:
         """When current or target size is zero, should handle correctly."""
         trade_buffer = 0.1
         # Zero current size returns full target size
-        result = YoloPositionSizer.calculate_position_size(0.0, 100.0, trade_buffer)
+        result = YoloPortfolioSizer.calculate_position_size(0.0, 100.0, trade_buffer)
         assert floats_equal(result, 100.0)
 
         # Zero current, negative target
-        result = YoloPositionSizer.calculate_position_size(0.0, -100.0, trade_buffer)
+        result = YoloPortfolioSizer.calculate_position_size(0.0, -100.0, trade_buffer)
         assert floats_equal(result, -100.0)
 
         # Zero target size returns negative of current (close position)
-        result = YoloPositionSizer.calculate_position_size(100.0, 0.0, trade_buffer)
+        result = YoloPortfolioSizer.calculate_position_size(100.0, 0.0, trade_buffer)
         assert floats_equal(result, -100.0)
 
-        result = YoloPositionSizer.calculate_position_size(-100.0, 0.0, trade_buffer)
+        result = YoloPortfolioSizer.calculate_position_size(-100.0, 0.0, trade_buffer)
         assert floats_equal(result, 100.0)
 
         # Both zero returns zero
-        result = YoloPositionSizer.calculate_position_size(0.0, 0.0, trade_buffer)
+        result = YoloPortfolioSizer.calculate_position_size(0.0, 0.0, trade_buffer)
         assert float_is_zero(result)
 
     def test_direction_flip_long_to_short(self) -> None:
@@ -111,7 +113,7 @@ class TestCalculatePositionSize:
             (50.0, -100.0, -140.0),
         ]
         for current_size, target_size, expected_delta in cases:
-            result = YoloPositionSizer.calculate_position_size(current_size, target_size, trade_buffer)
+            result = YoloPortfolioSizer.calculate_position_size(current_size, target_size, trade_buffer)
             assert floats_equal(result, expected_delta), (
                 f"Failed for current={current_size}, target={target_size}, expected={expected_delta}, got={result}"
             )
@@ -130,7 +132,7 @@ class TestCalculatePositionSize:
             (-7.9, 1.894357, 9.604921),
         ]
         for current_size, target_size, expected_delta in cases:
-            result = YoloPositionSizer.calculate_position_size(current_size, target_size, trade_buffer)
+            result = YoloPortfolioSizer.calculate_position_size(current_size, target_size, trade_buffer)
             assert floats_equal(result, expected_delta), (
                 f"Failed for current={current_size}, target={target_size}, expected={expected_delta}, got={result}"
             )
@@ -148,7 +150,7 @@ class TestCalculatePositionSize:
         ]
 
         for symbol, notional_size_signed, target_size_signed, expected_delta in cases:
-            result = YoloPositionSizer.calculate_position_size(
+            result = YoloPortfolioSizer.calculate_position_size(
                 notional_size_signed, target_size_signed, trade_buffer
             )
             assert floats_equal(result, expected_delta, 1e-3), (
@@ -174,11 +176,28 @@ def empty_portfolio() -> Portfolio:
     return Portfolio(exchange_id=ExchangeId.BINANCE, balances=[], perps=[])
 
 
-def test_position_sizing_logic(sample_target_weights: pl.DataFrame, empty_portfolio: Portfolio) -> None:
-    sizer = YoloPositionSizer()
+@pytest.fixture
+def sample_settings() -> YoloSettingsConfig:
+    return YoloSettingsConfig(
+        dry_run=True,
+        demo=True,
+        max_leverage=2.0,
+        equity_buffer=0.1,
+        trade_buffer=0.05,
+        momentum_factor=1.0,
+        trend_factor=1.0,
+        carry_factor=1.0,
+        executor=ExecutorConfig(execution="fast", max_spread_pct=0.01),
+    )
+
+
+def test_position_sizing_logic(
+    sample_target_weights: pl.DataFrame, empty_portfolio: Portfolio, sample_settings: YoloSettingsConfig
+) -> None:
+    sizer = YoloPortfolioSizer()
     equity = 10000.0
 
-    output_df = sizer.size_portfolio(equity, sample_target_weights, empty_portfolio)
+    output_df = sizer.size_portfolio(equity, sample_target_weights, empty_portfolio, sample_settings)
     TargetPortfolioSchema.validate(output_df)
 
     assert output_df.shape[0] == 2
@@ -189,3 +208,7 @@ def test_position_sizing_logic(sample_target_weights: pl.DataFrame, empty_portfo
     # ETH: 0.25 * 10000 / 3000 = 0.8333...
     eth_size = output_df.filter(pl.col("symbol") == "ETH/USDT").select("target_size_signed").item()
     assert pytest.approx(eth_size) == 0.8333333333333334
+
+    # Since portfolio is empty, delta should be equal to target size
+    btc_delta = output_df.filter(pl.col("symbol") == "BTC/USDT").select("delta").item()
+    assert btc_delta == 0.05
